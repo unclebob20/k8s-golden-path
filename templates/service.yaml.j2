@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: {{ app_namespace }}
+  name: {{ app_name }}
+  labels:
+    {% for k, v in labels.items() %}
+    {{ k }}: "{{ v }}"
+    {% endfor %}
+spec:
+  type: ClusterIP
+  ports:
+  - port: {{ network.service_port }}
+    targetPort: {{ network.container_port }}
+    protocol: TCP
+    name: http
+  selector:
+    app: {{ app_name }}

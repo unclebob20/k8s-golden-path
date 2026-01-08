@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ app_namespace }} # Add this to your HighThroughputAPI class
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: {{ app_namespace }}
+  name: {{ app_name }}
+  annotations:
+    {% for key, value in monitoring_annotations.items() %}
+    {{ key }}: "{{ value }}"
+    {% endfor %}
+spec:
+  replicas: {{ deploy_config.replicas }}
+  selector:
+    matchLabels:
+      app: {{ app_name }}
+  template:
+    metadata:
+      labels:
+        app: {{ app_name }}
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - {{ app_name }}
+                topologyKey: "kubernetes.io/hostname" # Spreads across nodes
+      containers:
+        - name: {{ app_name }}
+          image: {{ image_repo }}
+          env:
+          {% for key, value in container_env.items() %}
+          - name: {{ key }}
+            value: "{{ value }}"
+          {% endfor %}
+          ports:
+          - containerPort: 8080
+          startupProbe:
+            httpGet:
+              path: {{ metrics_path }}
+              port: {{ network.container_port }}
+            failureThreshold: {{ probes.startup.failureThreshold }}
+            periodSeconds: {{ probes.startup.periodSeconds }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ network.container_port }}
+            initialDelaySeconds: {{ probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ probes.liveness.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: /readyz # Often readiness is tied to the metrics/health endpoint
+              port: {{ network.container_port }}
+            initialDelaySeconds: {{ probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ probes.readiness.periodSeconds }}
+          resources:
+            requests:
+              cpu: {{ resources.cpu_request }}
+              memory: {{ resources.memory_request }}
+            limits:
+              cpu: {{ resources.cpu_limit }}
+              memory: {{ resources.memory_limit }} # Senior tip: No memory overcommit!

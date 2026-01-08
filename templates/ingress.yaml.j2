@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  namespace: {{ app_namespace }}
+  name: {{ app_name }}
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "{{ network.timeout_seconds }}"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "{{ network.timeout_seconds }}"
+    # Senior Tip: Ensure sticky sessions if J2EE apps require it
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: {{ network.ingress_host }}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ app_name }}
+            port:
+              number: {{ network.service_port }}
